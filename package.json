@@ -10,6 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-telegram-bot-api": "^0.54.0"
+    "@types/node-telegram-bot-api": "^0.57.1",
+    "dotenv": "^16.0.1",
+    "node-telegram-bot-api": "^0.57.0",
+    "ts-node": "^10.8.0",
+    "typescript": "^4.6.4",
+    "znn-ts-sdk": "github:dexter703/znn-ts-sdk"
   }
 }

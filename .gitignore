@@ -1,12 +1,9 @@
 .idea/
 node_modules/
 
-# ignore all content but keep directory
-data/*
-!data/.keep
-
-# sensitive config
-config/config.js
+.env
+#
+*.json
 
 # Mac files
 *.dylib
