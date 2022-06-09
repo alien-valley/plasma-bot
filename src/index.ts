@@ -7,6 +7,9 @@ import {Address} from "znn-ts-sdk/dist/lib/src/model/primitives/address";
 import {FusionEntryList} from "znn-ts-sdk/dist/lib/src/model/embedded/plasma";
 import {Hash} from "znn-ts-sdk/dist/lib/src/model/primitives/hash";
 
+// @ts-ignore
+import {version} from "../package.json"
+
 let bot: TelegramBot
 let zenon: Zenon
 let db: DB
@@ -116,8 +119,8 @@ async function getAllFuseEntries(): Promise<FusionEntryList> {
 }
 
 // handle /start command
-async function start(msg: TelegramBot.Message, header?: string) {
-  return bot.sendMessage(msg.chat.id, `${header}Welcome to the free plasma telegram bot,
+async function start(msg: TelegramBot.Message, header = "") {
+  return bot.sendMessage(msg.chat.id, `${header}Welcome to the free plasma telegram bot V${version},
 powered by alien-valley.io pillar
 and by YOU, the Zenon Community!
 
