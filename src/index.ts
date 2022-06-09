@@ -16,6 +16,10 @@ let myAddress: Address
 // 3 minutes of timeout
 const timeout = 3 * 60 * 1000
 
+function formatAmount(amount: number): string {
+  return (amount / 1e8).toPrecision(2)
+}
+
 // update the status of all fuse entries
 // if present in NoM list
 //   pending -> active
@@ -93,23 +97,23 @@ async function start(msg: TelegramBot.Message) {
 async function list(msg: TelegramBot.Message) {
   const user = getUser(msg)
 
-  let response = "";
+  const usedBalance = user.usedBalance()
+  let response = `Used ${formatAmount(usedBalance)}/${formatAmount(user.maxBalance)} QSR\n`;
+
   for (const entry of user.entries) {
     if (entry.status === "active") {
-      response = response + `✅ /${entry.sequenceNumber} ${entry.amount / 1e8} QSR to ${entry.beneficiary} [running]\n`
+      response = response + `✅ /${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [running]\n`
     } else if (entry.status === "pending") {
-      response = response + `⏳ /${entry.sequenceNumber} ${entry.amount / 1e8} QSR to ${entry.beneficiary} [pending]\n`
-    }
-  }
-  for (const entry of user.entries) {
-    if (entry.status === "invalid" || entry.status === "canceled") {
-      response = response + `❌ ${entry.amount / 1e8} QSR to ${entry.beneficiary} [canceled]\n`
+      response = response + `⏳ /${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [pending]\n`
     }
   }
 
-  if (response === "") {
-    return bot.sendMessage(msg.chat.id, "No entries");
+  for (const entry of user.entries) {
+    if (entry.status === "invalid" || entry.status === "canceled") {
+      response = response + `❌ ${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [canceled]\n`
+    }
   }
+
   return bot.sendMessage(msg.chat.id, response);
 }
 
@@ -138,6 +142,13 @@ async function fuse(msg: TelegramBot.Message) {
 
   // apply QSR decimals
   amount *= 1e8
+
+  const usedBalance = user.usedBalance()
+  const remaining = user.maxBalance - usedBalance
+  console.log(usedBalance, remaining)
+  if (amount > remaining) {
+    return bot.sendMessage(msg.chat.id, `Not enough QSR available. Required ${formatAmount(amount)} but only have ${remaining} QSR available`)
+  }
 
   // make the fuse transaction & broadcast it to the network
   const block = await zenon.embedded.plasma.fuse(toAddress, amount)

@@ -81,9 +81,11 @@ export class DBTelegramMessage {
 
 export class DBUser {
   id: string
+  messages: DBTelegramMessage[] = []
+
   nextFuseSequenceNumber: number = 1
   entries: DBFuseEntry[] = [];
-  messages: DBTelegramMessage[] = []
+  maxBalance: number = 50 * 1e8
 
   constructor(id: string) {
     this.id = id
@@ -95,23 +97,37 @@ export class DBUser {
     return next
   }
 
+  usedBalance(): number {
+    let balance = 0
+    for (const entry of this.entries) {
+      if (entry.status === 'pending' || entry.status === 'active') {
+        balance += entry.amount
+      }
+    }
+    return balance
+  }
+
   static deserialize(json: object, id: string): DBUser {
     // @ts-ignore
     const obj = new DBUser(id)
+    // @ts-ignore
+    obj.messages = json["messages"].map((x) => DBTelegramMessage.deserialize(x))
+
     // @ts-ignore
     obj.nextFuseSequenceNumber = json["nextFuseSequenceNumber"]
     // @ts-ignore
     obj.entries = json["entries"].map((x) => DBFuseEntry.deserialize(x))
     // @ts-ignore
-    obj.messages = json["messages"].map((x) => DBTelegramMessage.deserialize(x))
+    obj.maxBalance = json["maxBalance"]
     return obj
   }
 
   serialize() {
     return {
+      messages: this.messages.map(((value) => value.serialize())),
       nextFuseSequenceNumber: this.nextFuseSequenceNumber,
       entries: this.entries.map(((value) => value.serialize())),
-      messages: this.messages.map(((value) => value.serialize())),
+      maxBalance: this.maxBalance
     }
   }
 }
