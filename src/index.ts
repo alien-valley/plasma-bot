@@ -16,6 +16,35 @@ let myAddress: Address
 // 3 minutes of timeout
 const timeout = 3 * 60 * 1000
 
+// 10 hours
+const fuseDuration = 10 * 60 * 60 * 1000
+
+function formatTime(time: number): string {
+  const sec_num = Math.floor(time / 1000);
+  const hours = Math.floor(sec_num / 3600);
+  const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+  const seconds = sec_num - (hours * 3600) - (minutes * 60);
+
+  let result = "";
+
+  if (hours < 10) {
+    result += "0";
+  }
+  result += hours.toString() + ":"
+
+  if (minutes < 10) {
+    result += "0";
+  }
+  result += minutes.toString() + ":"
+
+  if (seconds < 10) {
+    result += "0";
+  }
+  result += seconds.toString()
+
+  return result
+}
+
 function formatAmount(amount: number): string {
   return (amount / 1e8).toPrecision(2)
 }
@@ -101,10 +130,13 @@ async function list(msg: TelegramBot.Message) {
   let response = `Used ${formatAmount(usedBalance)}/${formatAmount(user.maxBalance)} QSR\n`;
 
   for (const entry of user.entries) {
-    if (entry.status === "active") {
-      response = response + `✅ /${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [running]\n`
+    const lifeTime = new Date().getTime() - entry.creationTime;
+    if (entry.status === "active" && lifeTime > fuseDuration) {
+      response = response + `✅ /${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary}\n`
+    } else if (entry.status === "active") {
+      response = response + `✅ ${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [${formatTime(fuseDuration - lifeTime)}]\n`
     } else if (entry.status === "pending") {
-      response = response + `⏳ /${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [pending]\n`
+      response = response + `⏳ ${entry.sequenceNumber} ${formatAmount(entry.amount)} QSR to ${entry.beneficiary} [pending]\n`
     }
   }
 
@@ -133,19 +165,21 @@ async function fuse(msg: TelegramBot.Message) {
   try {
     toAddress = Address.parse(splits[1])
     amount = parseInt(splits[2])
-    if (amount < 10 || isNaN(amount)) {
-      return bot.sendMessage(msg.chat.id, `Amount too small. Needs to be bigger than 10 QSR. ${usage}`)
-    }
   } catch {
     return bot.sendMessage(msg.chat.id, `Invalid address. ${usage}`)
+  }
+
+  // check amount is valid
+  if (amount < 10 || isNaN(amount)) {
+    return bot.sendMessage(msg.chat.id, `Amount too small. Needs to be bigger than 10 QSR. ${usage}`)
   }
 
   // apply QSR decimals
   amount *= 1e8
 
+  // check if user has enough QSR balance to perform the fuse operation
   const usedBalance = user.usedBalance()
   const remaining = user.maxBalance - usedBalance
-  console.log(usedBalance, remaining)
   if (amount > remaining) {
     return bot.sendMessage(msg.chat.id, `Not enough QSR available. Required ${formatAmount(amount)} but only have ${remaining} QSR available`)
   }
