@@ -46,7 +46,7 @@ function formatTime(time: number): string {
 }
 
 function formatAmount(amount: number): string {
-  return (amount / 1e8).toPrecision(2)
+  return (amount / 1e8).toFixed(1)
 }
 
 // update the status of all fuse entries
@@ -116,10 +116,26 @@ async function getAllFuseEntries(): Promise<FusionEntryList> {
 }
 
 // handle /start command
-async function start(msg: TelegramBot.Message) {
-  return bot.sendMessage(msg.chat.id, `Usage
-/list
-/fuse {address} {amount}`);
+async function start(msg: TelegramBot.Message, header?: string) {
+  return bot.sendMessage(msg.chat.id, `${header}Welcome to the free plasma telegram bot,
+powered by alien-valley.io pillar
+and by YOU, the Zenon Community!
+
+If you want to support the pillar, just delegate to it.
+All funds will be used to invest in Research
+which will benefit the network.
+
+Usage:     
+To receive free plasma, just send a message with the desired address
+10 QSR will be fused to the provided address.
+Each telegram account has a limit of 50 QSR.
+
+Advanced usage:
+/list - show all fuse entries
+/fuse {address} {amount} - fuse to a specific {address} a specified {amount} of QSR
+/{number} - cancel the fuse entry with that number
+{address} - fuse 10 QSR to {address}
+`);
 }
 
 // handle /list command
@@ -149,30 +165,9 @@ async function list(msg: TelegramBot.Message) {
   return bot.sendMessage(msg.chat.id, response);
 }
 
-// handle /fuse {address} {amount} command
-async function fuse(msg: TelegramBot.Message) {
+// shared function
+async function simpleFuse(msg: TelegramBot.Message, toAddress: Address, amount: number) {
   const user = getUser(msg)
-  const usage = "example: /fuse z1qzyzqtszv6fnw56rpnlq0npqt70tux0cl0yn5k 10"
-
-  // parse input
-  const splits = msg.text!.split(' ')
-  let toAddress: Address
-  let amount: number
-  if (splits.length !== 3) {
-    return bot.sendMessage(msg.chat.id, `Incorrect number of parameters. ${usage}`)
-  }
-
-  try {
-    toAddress = Address.parse(splits[1])
-    amount = parseInt(splits[2])
-  } catch {
-    return bot.sendMessage(msg.chat.id, `Invalid address. ${usage}`)
-  }
-
-  // check amount is valid
-  if (amount < 10 || isNaN(amount)) {
-    return bot.sendMessage(msg.chat.id, `Amount too small. Needs to be bigger than 10 QSR. ${usage}`)
-  }
 
   // apply QSR decimals
   amount *= 1e8
@@ -200,6 +195,33 @@ async function fuse(msg: TelegramBot.Message) {
   db.save()
 
   return bot.sendMessage(msg.chat.id, "Fuse transaction send!")
+}
+
+// handle /fuse {address} {amount} command
+async function fuse(msg: TelegramBot.Message) {
+  const usage = "example: /fuse z1qzyzqtszv6fnw56rpnlq0npqt70tux0cl0yn5k 10"
+
+  // parse input
+  const splits = msg.text!.split(' ')
+  let toAddress: Address
+  let amount: number
+  if (splits.length !== 3) {
+    return bot.sendMessage(msg.chat.id, `Incorrect number of parameters. ${usage}`)
+  }
+
+  try {
+    toAddress = Address.parse(splits[1])
+    amount = parseInt(splits[2])
+  } catch {
+    return bot.sendMessage(msg.chat.id, `Invalid address. ${usage}`)
+  }
+
+  // check amount is valid
+  if (amount < 10 || isNaN(amount)) {
+    return bot.sendMessage(msg.chat.id, `Amount too small. Needs to be bigger than 10 QSR. ${usage}`)
+  }
+
+  return simpleFuse(msg, toAddress, amount)
 }
 
 // handle /{number} command
@@ -233,10 +255,6 @@ async function handleMsg(msg: TelegramBot.Message) {
 
   const splits = msg.text!.split(' ')
 
-  if (splits[0][0] !== "/") {
-    return;
-  }
-
   switch (splits[0]) {
     case '/start':
       return start(msg)
@@ -247,10 +265,20 @@ async function handleMsg(msg: TelegramBot.Message) {
   }
 
   // handle /{number}
-  const number = parseInt(splits[0].substring(1))
-  if (!(isNaN(number) || number == 0)) {
-    return cancelFuse(msg)
+  if (splits[0][0] === "/") {
+    const number = parseInt(splits[0].substring(1))
+    if (!(isNaN(number) || number == 0)) {
+      return cancelFuse(msg)
+    }
   }
+
+  // handle {address} for a 10 QSR fuse
+  try {
+    const toAddress = Address.parse(splits[0])
+    return simpleFuse(msg, toAddress, 10)
+  } catch (e) {}
+
+  return start(msg, `Unknown command '${splits[0]}'\n\n`)
 }
 
 async function main() {
