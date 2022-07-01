@@ -1,7 +1,9 @@
 import {getConfig} from "./config";
 import {DB, DBFuseEntry, DBTelegramMessage, DBUser} from "./db";
-import {KeyStore, Zenon} from "znn-ts-sdk";
+import SyncTelegramBot from "./telegram_bot";
 import TelegramBot from 'node-telegram-bot-api';
+
+import {KeyStore, Zenon} from "znn-ts-sdk";
 import {KeyPair} from "znn-ts-sdk/dist/lib/src/wallet/keypair";
 import {Address} from "znn-ts-sdk/dist/lib/src/model/primitives/address";
 import {FusionEntryList} from "znn-ts-sdk/dist/lib/src/model/embedded/plasma";
@@ -10,7 +12,7 @@ import {Hash} from "znn-ts-sdk/dist/lib/src/model/primitives/hash";
 // @ts-ignore
 import {version} from "../package.json"
 
-let bot: TelegramBot
+let bot: SyncTelegramBot
 let zenon: Zenon
 let db: DB
 let keyPair: KeyPair
@@ -252,7 +254,11 @@ async function cancelFuse(msg: TelegramBot.Message) {
   return bot.sendMessage(msg.chat.id, "Fuse entry cancel requested")
 }
 
-async function handleMsg(msg: TelegramBot.Message) {
+async function handleMsg(msg: TelegramBot.Message): Promise<TelegramBot.Message> {
+  if (msg.text === undefined) {
+    return bot.sendMessage(msg.chat.id, "failed to handle message: message expired")
+  }
+
   // record all messages in DB
   getUser(msg).messages.push(DBTelegramMessage.fromTelegramMessage(msg))
 
@@ -279,7 +285,8 @@ async function handleMsg(msg: TelegramBot.Message) {
   try {
     const toAddress = Address.parse(splits[0])
     return simpleFuse(msg, toAddress, 10)
-  } catch (e) {}
+  } catch (e) {
+  }
 
   return start(msg, `Unknown command '${splits[0]}'\n\n`)
 }
@@ -302,9 +309,7 @@ async function main() {
   keyPair = store.getKeyPair()
   myAddress = await keyPair.getAddress()
 
-  // set up telegram bot
-  bot = new TelegramBot(config.telegramToken, {polling: true});
-  bot.on('message', handleMsg)
+  bot = new SyncTelegramBot(config.telegramToken, handleMsg)
 
   // update the state of the DB every 10 seconds
   setInterval(updateStatus, 10000)
